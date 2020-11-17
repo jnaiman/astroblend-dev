@@ -1,0 +1,14 @@
+# check out: http://blenderartists.org/forum/archive/index.php/t-232443.html
+#  with: bpy.context.object.particle_systems[0].particles[ii].velocity = ([0,0,-ii/5])
+
+
+As far as I know there is no way for Blender python to create influence like a force field. Sure, I can create a force field and place it in the scene but I can not create any new type of field influence via python.
+
+From your description I would suggest looking into a new rule for Boids. Only pursue this route if you are able to compile Blender and know C/C++.
+
+If you feel like you can create your goal in Python I offer up my RE:ticular (http://blenderartists.org/forum/showthread.php?236342-AddOn-RE-ticular-Particle-Extensions-For-2.6) code for examination. It monitors an existing particle system and creates an object for each particle in the system. So how is this different from the existing implementation of a particle system deploying objects or groups? RE:ticular is different in the fact that the objects are "real" and in the scene, not just a managed element of a single object like the particle system. For instance you can not control the location of a particle via python, but with RE:ticular you can control the location of the cloned particle.
+
+The game engine has other limitations like no access to bpy during runtime.
+
+
+Particle positions are read-only at the python level. But you can create a mesh object with vertices at the exact locations and use the particle system, in vertex mode, to deploy particles at those vertex locations. Then you can keyframe force field influences to excite the particles into action at some given time.

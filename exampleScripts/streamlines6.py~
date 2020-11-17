@@ -1,0 +1,186 @@
+import science
+import yt
+import numpy as np
+from yt.visualization.api import Streamlines
+from mathutils import Vector
+import random
+from scipy import interpolate
+
+
+fname = '/Users/jillnaiman/data/IsolatedGalaxy/galaxy0030/galaxy0030'
+
+ssname = "MyStream"
+
+
+# now, get stream line
+ds = yt.load(fname)
+
+c = np.array([0.5]*3)
+N = 10  # number of stream lines
+scale = 1.0
+pos_dx = np.random.random((N,3))*scale-scale/2.
+pos = c+pos_dx
+
+streamlines = Streamlines(ds,pos,'velocity_x', 'velocity_y', 'velocity_z', length=1.0)
+streamlines.integrate_through_volume()
+
+# select out 1 stream... for now
+stream = streamlines.streamlines[1]
+stream = stream[np.all(stream != 0.0, axis=1)] # doen something fancy
+
+
+# units
+stream = stream*ds.length_unit # into cm 
+# now, scale down to what we want
+stream = stream/yt.units.cm
+stream = stream/3.1e18 # pc
+
+# for this case
+stream = stream/1e5
+
+x = stream[:,0]
+y = stream[:,1]
+z = stream[:,2]
+
+
+# this will eventually be filled by an actual colormap
+#  from data taken on the steamline
+colors = np.zeros((len(stream),3))
+for i in range(0,len(stream)):
+    colors[i,0] = random.random()
+    colors[i,1] = random.random()
+    colors[i,2] = random.random()
+
+#x = floor(len(stream)/20.0)
+#
+#if ((x % 2) != 0):
+#    x=x+1
+
+Nvals = max(100,floor(len(stream)/20.0)) 
+#method='cubic' # or nearest, or linear
+method='linear' # or nearest, or linear
+xn = np.linspace(x.min(),x.max(),Nvals)
+
+# y(x)
+f = interpolate.interp1d(x,y,kind=method)
+yn = f(xn)
+
+# z(x)
+f = interpolate.interp1d(x,z,kind=method)
+zn = f(xn)
+
+# also remap colors
+f = interpolate.interp1d(x,colors[:,0],kind=method)
+r = f(xn)
+f = interpolate.interp1d(x,colors[:,1],kind=method)
+g = f(xn)
+f = interpolate.interp1d(x,colors[:,2],kind=method)
+b = f(xn)
+
+rgb = []
+for i in range(0,Nvals):
+    rgb.append([r[i],g[i],b[i]])
+
+
+
+# put back in a smaller stream
+streamn = np.zeros((Nvals,3))
+
+streamn[:,0] = xn
+streamn[:,1] = yn
+streamn[:,2] = zn
+
+
+
+
+
+# make 2 meshes into one mesh
+def join_surfaces(name_list):
+    science.deselect_all()
+    # join objects
+    bpy.context.scene.objects.active = bpy.data.objects[name_list[0]]
+    for i in range(0,len(name_list)):
+        bpy.data.objects[name_list[i]].select = True
+    bpy.ops.object.join()
+
+
+###Nvals = 19
+# add in cylinders
+cyl_verts = 16
+ncylinders = Nvals # how many cylinders total?
+cyl_scale_xy = 0.01
+cyl_scale_z = 1.0/Nvals
+
+bpy.ops.mesh.primitive_cylinder_add(vertices=cyl_verts, radius=1, depth=2, location=(0, 0, 0), rotation=(0, 0, 0))
+
+cyl1 = bpy.data.objects['Cylinder']
+cyl1.name = 'Cyl1'
+cyl1.location = (0,0,0)
+
+
+for i in range(0, ncylinders-1):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=cyl_verts, radius=1, depth=2, location=(0, 0, 0), rotation=(0, 0, 0))
+    cyl2 = bpy.data.objects['Cylinder']
+    cyl2.name = 'Cyl2'
+    cyl2.location = (0,0,2*i+2)
+    # named by first name!!
+    join_surfaces([cyl1.name,cyl2.name])
+
+
+# make skinny
+cyl1.scale = (cyl_scale_xy,cyl_scale_xy,cyl_scale_z)
+
+
+mesh = cyl1.data
+
+
+if len(mesh.vertex_colors) == 0:
+    bpy.ops.mesh.vertex_color_add()
+
+color_layer = mesh.vertex_colors["Col"]
+
+
+i = 0
+for c in range(0,ncylinders):
+    for ip in range(c*(cyl_verts+2),(c+1)*(cyl_verts+2)):
+        for idx in mesh.polygons[ip].loop_indices:
+            color_layer.data[i].color = rgb[c]
+            print('idx = ' + str(idx))
+            i += 1
+    
+
+
+# now, lets make the curve to deform this thing along
+# weight
+w = 1
+ 
+sname = ssname + "Object"
+ 
+
+# create bevel object
+science.deselect_all()
+# add curve
+#bpy.ops.curve.primitive_bezier_circle_add(radius=0.1,  location=(0, 0, 0), rotation=(0, 0, 0))
+#bevob = bpy.data.objects['BezierCircle']
+
+def MakePolyLine(objname, curvename, cList):
+    curvedata = bpy.data.curves.new(name=curvename, type='CURVE')
+    curvedata.dimensions = '3D'
+    ##curvedata.bevel_object = bevel_obj
+    objectdata = bpy.data.objects.new(objname, curvedata)
+    objectdata.location = (0,0,0) #object origin
+    bpy.context.scene.objects.link(objectdata)
+    polyline = curvedata.splines.new('NURBS')
+    polyline.points.add(len(cList)-1)
+    for num in range(len(cList)):
+        polyline.points[num].co = (cList[num])+(w,)
+    polyline.order_u = len(polyline.points)-1
+    polyline.use_endpoint_u = True
+
+
+MakePolyLine(sname, ssname, tuple(map(tuple,streamn)))
+ 
+stobj = bpy.data.curves[ssname]
+
+
+## NOT GREAT! CHECK OUT: http://wiki.blender.org/index.php/Doc:2.6/Manual/Modeling/Curves/Editing/Advanced

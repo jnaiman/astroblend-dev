@@ -1,0 +1,14 @@
+
+
+# first create but if it does exist
+flagg = False
+# do we have cube?
+for ob in bpy.data.objects:
+    if ob.name == 'Cube':
+        flagg = True
+
+
+if flagg:
+    bpy.ops.mesh.primitive_cube_add(radius=1.0)
+
+

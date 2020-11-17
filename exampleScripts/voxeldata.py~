@@ -1,0 +1,39 @@
+#typedef struct VoxelData {
+#	int resol[3];
+#	int interp_type;
+#	short file_format;
+#	short flag;
+#	short extend;
+#	short smoked_type;
+#	short hair_type;
+#	short data_type;
+#	int _pad;
+#	
+#	struct Object *object; /* for rendering smoke sims */
+#	float int_multiplier;
+#	int still_frame;
+#	char source_path[1024];  /* 1024 = FILE_MAX */
+#
+#	/* temporary data */
+#	float *dataset;
+#	int cachedframe;
+#	int ok;
+#	
+#} VoxelData;
+
+import ctypes
+
+
+
+Object = bpy.data.object['Cube']
+
+ctypes.class VoxelData(Structure):
+    _fields_ = [("resol", (c_int, c_int, c_int)),
+                ("interp_type", c_int),
+                ("file_format", c_short),
+                ("flag", c_short),
+                ("extend", c_short),
+                ("hair_type", c_short),
+                ("data_type", c_short),
+                ("_pad", c_int),
+                

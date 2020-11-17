@@ -1,0 +1,15 @@
+import bpy
+
+
+class Render:
+
+    # initialize rendering
+    def __init__(self, render_directory, render_name, scene_name = 'Scene', file_format = 'PNG'):
+        bpy.data.scenes[scene_name].render.image_settings.file_format = file_format
+        self.__nframe = 0
+        self.nframe = 0
+        # where things are stored
+        self.render_directory = render_directory
+        self.render_name = render_name
+        self.file_format = file_format
+        self.scene_name = scene_name

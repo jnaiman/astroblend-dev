@@ -1,0 +1,3 @@
+import yt
+ds = yt.load('~/data/TipsyGalaxy/galaxy.00300', n_ref=8)
+yt.ProjectionPlot(ds, 'z', ('gas','density'), width=(40, 'kpc'), center='m').save('~/Desktop/proj2.py')

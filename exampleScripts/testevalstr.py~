@@ -1,0 +1,2 @@
+def myfun(data):
+    (eval("import numpy as np; import numpy; return " + np.sqrt(data) ))

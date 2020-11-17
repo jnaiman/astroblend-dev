@@ -1,0 +1,14 @@
+import bpy
+
+
+
+class ytGrid(object):
+    def __init__(self, ds, grid_name="ytGrid", center = [0.,0.,0.]):
+        right_edge = ds.index.grid_right_edge
+        left_edge =  ds.index.grid_left_edge
+
+        bpy.ops.mesh.primitive_cube_add(radius=1.0)
+        bpy.ops.object.modifier_add(type='WIREFRAME') # make wireframe
+        bpy.data.objects['Cube'].name = grid_name
+        bpy.data.objects[grid_name].location = ds.domain_center.in_units('unitary')
+        # loop through and make grids, join them

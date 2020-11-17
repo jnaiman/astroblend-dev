@@ -1,0 +1,43 @@
+import science
+import numpy as np
+import yt
+
+# Enzo data
+filename = '~/data/IsolatedGalaxy/galaxy0030/galaxy0030'
+
+ds = yt.load(filename)
+
+my_sphere = ds.sphere("c", (200, "kpc"))
+
+# make a phase plot
+plot = yt.PhasePlot(my_sphere, "density", "temperature", ["cell_mass"],weight_field=None)
+
+image = plot.plots[('gas', 'cell_mass')].image
+
+imgb = bpy.ops.image.new(name='myimage')
+
+
+
+# from: http://blender.stackexchange.com/questions/643/is-it-possible-to-create-image-data-and-save-to-a-file-from-a-script
+size = 640, 480
+# blank image
+image = bpy.data.images.new("MyImage", width=size[0], height=size[1])
+
+## For white image
+# pixels = [1.0] * (4 * size[0] * size[1])
+
+pixels = [None] * size[0] * size[1]
+for x in range(size[0]):
+    for y in range(size[1]):
+        # assign RGBA to something useful
+        r = x / size[0]
+        g = y / size[1]
+        b = (1 - r) * g
+        a = 1.0
+        pixels[(y * size[0]) + x] = [r, g, b, a]
+
+# flatten list
+pixels = [chan for px in pixels for chan in px]
+
+# assign pixels
+image.pixels = pixels

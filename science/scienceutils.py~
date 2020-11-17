@@ -1,0 +1,85 @@
+import bpy
+
+
+
+############ MATERIAL/TEXTURE FUNCTIONS #######################
+
+
+# The following function is adapted from
+# Nick Keeline "Cloud Generator" addNewObject
+# from object_cloud_gen.py (an addon that comes with the Blender 2.6 package)
+
+# these are if you wanna change the colors or transparencies on the fly
+def makeMaterial(name, diffuse, specular, alpha, emiss, mat_type=None, halo_size=None):
+    mat = bpy.data.materials.new(name)
+    mat.emit = emiss # emissivity is up to 2.0!
+    mat.diffuse_color = diffuse
+    mat.diffuse_shader = 'LAMBERT' 
+    mat.diffuse_intensity = 1.0 
+    mat.specular_color = specular
+    mat.specular_shader = 'COOKTORR'
+    mat.specular_intensity = 0.5
+    mat.alpha = alpha  # sets transparency (0.0 = invisable)
+    mat.use_transparency = True # assumes Z-transparency
+#    mat.ambient = 1use  # can't have for transparency
+    if mat_type is not None:
+        mat.type = mat_type
+    if halo_size is not None:
+        mat.halo.size = halo_size
+    return mat
+ 
+
+# set a material on an object
+def setMaterial(ob, mat):
+    me = ob.data
+    me.materials.append(mat)
+    
+
+# to delete unused materials from things when deleting the object
+def delete_unused_materials(name):
+    for mat in bpy.data.materials:
+        if (mat.name.find(name) != -1):
+            mat.user_clear()
+            bpy.data.materials.remove(mat)
+    # delete material slots too
+    for i in range(0,len(bpy.data.objects[name].material_slots)):
+        bpy.context.object.active_material_index = i
+        bpy.ops.object.material_slot_remove()
+
+
+# delete associated textures from an object
+def delete_unused_textures(name):
+    for tex in bpy.data.textures:
+        if (tex.name.find(name) != -1):
+            tex.user_clear()
+            bpy.data.textures.remove(tex)
+
+
+# change the color of the text or mesh
+def set_object_color(name, color = None, shadeless = None):
+    if shadeless is None:
+        shadeless = True
+    if color is None:
+        color = (0,0,0.)
+    # now, set color
+    # first, remove other materials
+    deselect_all()
+    bpy.data.objects[name].select = True
+    delete_unused_materials(name)
+    textmat = makeMaterial(name, color, (1,1,1), 1.0, 0.0) # no emissivity or transperency for now
+    setMaterial(bpy.data.objects[name], textmat)
+    # also, make shadeless
+    if shadeless:
+        bpy.data.materials[name].use_shadeless = True
+
+# make 2 meshes into one mesh
+def join_surfaces(name_list):
+    deselect_all()
+    # join objects
+    bpy.context.scene.objects.active = bpy.data.objects[name_list[0]]
+    for i in range(0,len(name_list)):
+        bpy.data.objects[name_list[i]].select = True
+    bpy.ops.object.join()
+
+
+###################################################################

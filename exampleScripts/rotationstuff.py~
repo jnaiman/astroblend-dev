@@ -1,0 +1,6 @@
+import numpy as np
+
+
+axis = np.array([5, 4, 3]) # rotate around this
+vec = np.array([2, 2, 2]) # vector to rotate
+

@@ -1,0 +1,150 @@
+#!/usr/bin/python
+# Filename: science.py
+import bpy
+import sys
+#sys.path.append("/Applications/Blender/blender.app/Contents/MacOS/2.65/python/lib/python3.3/")
+#import asciitable as ast
+from math import *
+#import numpy as np  # seriously, numpy isn't installed?  wtf??
+
+radius_lamp = 0.0 # radius to have lamp travel around, if following camera
+
+# how the motion of the lamp, if there is one, will be calculated
+#  options so far are 'TRACKING' to follow the camera or None, for fixed
+lamp_motion = None
+
+# keep track of what frame we are one
+nframe = 0  # CHANGE THIS!!!
+
+# where things are stored
+render_directory = None
+render_name = None
+
+# these are if you wanna change the colors or transparencies on the fly
+def makeMaterial(name, diffuse, specular, alpha):
+    mat = bpy.data.materials.new(name)
+    mat.emit = 0.0 # emissivity is up to 2.0!
+    mat.diffuse_color = diffuse
+    mat.diffuse_shader = 'LAMBERT' 
+    mat.diffuse_intensity = 1.0 
+    mat.specular_color = specular
+    mat.specular_shader = 'COOKTORR'
+    mat.specular_intensity = 0.5
+    mat.alpha = alpha  # sets transparency (0.0 = invisable)
+    mat.use_transparency = True # assumes Z-transparency
+#    mat.ambient = 1use  # can't have for transparency
+#    print(mat.alpha)
+    return mat
+ 
+def setMaterial(ob, mat):
+    me = ob.data
+    me.materials.append(mat)
+
+def init_camera():
+    # set initial camera location, everything rotates from here
+    # in kpc, so far, camera is set such that this must < 0 to get the camera right
+    camera_x = 5. 
+    camera_y = 0.0
+    camera_z = 0.0
+    # set up initial camera
+    scene = bpy.data.scenes["Scene"]
+    scene.camera.location.x = camera_x
+    scene.camera.location.y = camera_y
+    scene.camera.location.z = camera_z
+    # set camera angle (where its pointing) -> set pointing along x-axis
+    scene.camera.rotation_mode = 'XYZ'
+    scene.camera.rotation_euler[0] = 90.0*(pi/180.0) # around x
+    scene.camera.rotation_euler[1] = 0.0 # around y
+    #scene.camera.rotation_euler[2] = 90.0*(pi/180.0) # around z 
+    scene.camera.rotation_euler[2] = -90.0*(pi/180.0) # around z 
+
+# perhaps try the following:
+#>>> scene.camera.rotation_mode = 'QUATERNION'
+#>>> scene.camera.rotation_quaternion = Quaternion([0,0,1],radians(90))
+#    q1 = Quaternion([0,0,1],radians(90.))
+#    q2 = Quaternion([1,0,0],radians(90.))
+#>>> scene.camera.rotation_quaternion = q3
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.0)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.1)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.2)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.3)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.4)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.5)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.6)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.7)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.8)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 0.9)
+#>>> scene.camera.rotation_quaternion = q1.slerp(q2, 1.0)
+
+def init_lighting(lighting_type = None, lighting_motion = None, 
+                  xpos=None, ypos=None, zpos=None):
+    if lighting_type is None or lighting_type is 'SUN':
+        lamp_type = 'SUN'
+        lt = 'Sun'
+        if xpos is None:
+            xpos = -3.0
+        if ypos is None:
+            ypos = 0.0
+        if zpos is None:
+            zpos = 5.0
+        # add in the sun
+        bpy.ops.object.lamp_add(type=lamp_type)
+        lamp = bpy.data.objects[lt]
+        lamp.location.x = xpos
+        lamp.location.y = ypos
+        lamp.location.z = zpos
+        radius_lamp = sqrt(xpos**2 + ypos**2 + zpos**2)
+        lamp_motion = lighting_motion
+    if lighting_type == 'EMISSION': # or do emission lighting
+        # turn up emissivity of all objects to look nice
+        bpy.data.worlds['World'].light_settings.indirect_factor=20. 
+        # have to use approximate, not ray tracing for emitting objects ...
+        #   ... for now... 
+        bpy.data.worlds['World'].light_settings.gather_method = 'APPROXIMATE' 
+        bpy.data.worlds['World'].horizon_color = [0.0, 0.0, 0.0] # horizon = black
+        bpy.data.worlds['World'].light_settings.use_indirect_light = True  # emitting things
+        lamp_motion = None # no tracking
+
+def set_camera(c_location, c_pointing):
+    #init_camera()  # for now, need this for some reason
+    scene = bpy.data.scenes["Scene"]
+    # change to cam coords to find angles
+    lxo = c_pointing[0] - c_location[0]
+    lyo = c_pointing[1] - c_location[1]
+    lzo = c_pointing[2] - c_location[2]
+    scene.camera.location.x = c_location[0]
+    scene.camera.location.y = c_location[1]
+    scene.camera.location.z = c_location[2]
+    # theta
+    th = atan(lyo/lxo)#-radians(90.)
+    if lxo < 0.0: th = th + radians(180.)
+    ph = acos(lzo/sqrt(lxo**2. + lyo**2 + lzo**2))
+    if lyo < 0.0: ph = -ph
+    # rotated camera by total theta to new pointing
+    scene.camera.rotation_euler[2] = th  - radians(90.) # motion in the x-y plane
+    # also, find new phi
+    scene.camera.rotation_euler[0] = ph 
+    print('theta = ' + str(degrees(th)))
+    print('phi = ' + str(degrees(ph)))
+
+# *** NEED TO ADD SIM TIME!!, add different pointings
+def rotate_camera(radius, th1, ph1, th2, ph2, frames=None, sim_time = None, verbose=True):
+    global nframe ### CHANGE!!!
+    scene = bpy.data.scenes["Scene"]
+    dth = (th2 - th1)/(frames-1.)
+    dph = (ph2 - ph1)/(frames-1.)
+    if verbose: print('Rotating Camera from ' + str(nframe) + ' to ' + str(nframe+frames-1))
+    for r in range(0,frames):
+        cx = radius*cos((th1+dth*r)*(pi/180.))*sin((ph1+dph*r)*(pi/180.0))
+        cy = radius*sin((th1+dth*r)*(pi/180.))*sin((ph1+dph*r)*(pi/180.0))
+        cz = radius*cos((ph1+dph*r)*(pi/180.0))
+        if lamp_motion is 'TRACKING': 
+            rotate_lamp(radius, th1, ph1, th1+dth*r, ph1+dph*r)
+        set_camera([cx,cy,cz], [0., 0., 0.])
+        # render for each rotation
+        num = "%04d" % (nframe)
+        r_name = render_name + num 
+        bpy.data.scenes["Scene"].render.filepath = render_directory + r_name
+        bpy.ops.render.render(write_still=True)
+        nframe = nframe+1
+    if verbose: print('Done Rotating Camera')

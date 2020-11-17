@@ -1,0 +1,105 @@
+def import_ytsph(filename, halo_sizes, color_field, color_map, color_log, n_ref):
+    from yt import load
+    import numpy as np
+    import bmesh
+    from scienceutils import deselect_all
+    from scienceutils import makeMaterial, setMaterial
+    ds = load(filename)
+    # strip "/" for naming
+    xnn2 = 0
+    xnn = 0
+    # you only want the file name, not all the directory stuff
+    while xnn != -1:
+        xnn2 = xnn
+        xnn = filename.find('/',xnn+1)
+    fname_out = filename[xnn2+1:]            
+    # get coords and color data
+    dd = ds.all_data()
+    #xcoord = dd['Gas','Coordinates'][:,0].v
+    #ycoord = dd['Gas','Coordinates'][:,1].v
+    #zcoord = dd['Gas','Coordinates'][:,2].v
+    xcoord = (dd['Gas','Coordinates'][:,0].in_units('unitary')).v
+    ycoord = (dd['Gas','Coordinates'][:,1].in_units('unitary')).v
+    zcoord = (dd['Gas','Coordinates'][:,2].in_units('unitary')).v
+    cs = dd[color_field]
+    print('cs')
+    print(len(cs))
+    # map colorcode to 256 material colors
+    if color_log: cs = np.log10(cs)
+    mi, ma = cs.min(), cs.max()
+    cs = (cs - mi) / (ma - mi)
+    from yt.visualization._colormap_data import color_map_luts # import colors 
+    # the rgb colors
+    colors = color_map_luts[color_map]
+    x = np.mgrid[0.0:1.0:colors[0].shape[0]*1j]
+    # how the values map to the colors
+    color_index = (np.interp(cs,x,x)*(colors[0].shape[0]-1)).astype("uint8")
+    color_index_list = color_index.tolist()
+    name = []
+    hused = []
+    scale = [(1.0, 1.0, 1.0)]
+    # create scale if necessary
+    if len(scale[:][:]) < color_index.max(): # generate larger scale
+        sc = (scale[0][0], scale[0][1], scale[0][2])
+        scale = []
+        for i in range(color_index.min(), color_index.max()):
+            scale.append(sc)
+    # also, allow for multiple halo sizes
+    if len(halo_sizes) < color_index.max():
+        hs = halo_sizes[0]
+        halo_sizes = []
+        for i in range(color_index.min(), color_index.max()):
+            halo_sizes.append(hs)
+    # create sph data into meshes and color them
+    for ind in range(color_index.min(), color_index.max()):
+        cl = [i for i,j in enumerate(color_index_list) if j == ind]
+        print(ind)
+        if len(cl) > 0:
+            #print("particle name")
+            #print(name)
+            fname = fname_out + '_' + str(ind)
+            name.append('particle_'+fname)
+            hused.append(halo_sizes[ind])
+            me = bpy.data.meshes.new('particleMesh_'+fname)
+            ob = bpy.data.objects.new('particle_'+fname,me)
+            ob.location = (0,0,0)
+            bpy.context.scene.objects.link(ob)    # Link object to scene
+            coords = [(0,0,0)]
+            me.from_pydata(coords,[],[])
+            ob.location = (0,0,0)
+            ob = bpy.data.objects['particle_'+fname] # select right object
+            deselect_all()
+            ob.select = True
+            bpy.context.scene.objects.active=ob
+            mat = makeMaterial('particle_'+fname, 
+                                       (colors[0][ind],colors[1][ind],colors[2][ind]), 
+                                       (1,1,1), 1.0, 1.0, mat_type = 'HALO', halo_size=halo_sizes[ind])
+            setMaterial(ob,mat)
+            # add in verts
+            bpy.ops.object.mode_set(mode='EDIT')  # toggle to edit mode
+            bm = bmesh.from_edit_mesh(ob.data)
+            # now, find all verts with this color index (ind)
+            # move original vertex to actual location
+            if hasattr(bm.verts, "ensure_lookup_table"): # to make it work with 2.73
+                bm.verts.ensure_lookup_table()
+            bm.verts[0].co = (xcoord[cl[0]]*scale[ind][0],ycoord[cl[0]]*scale[ind][1],zcoord[cl[0]]*scale[ind][2])
+            print('coords')
+            print(xcoord[cl[0]], ycoord[cl[0]], zcoord[cl[0]])
+            print(len(cl))
+            print(len(xcoord))
+            for i in range(1,len(xcoord[cl])):
+                bm.verts.new((xcoord[cl[i]]*scale[ind][0],ycoord[cl[i]]*scale[ind][1],zcoord[cl[i]]*scale[ind][2]))
+            bmesh.update_edit_mesh(ob.data)
+            bpy.ops.object.mode_set(mode='OBJECT')
+            #print(ind)
+            #print(bpy.data.objects['particle_' + fname].name)
+            print(bpy.data.objects['particle_' + fname].location)
+    #print("NAME OUT HERE")
+    #print(name)
+    return name, ds, hused
+
+
+
+
+filename = '~/data/TipsyGalaxy/galaxy.00300'
+name,ds,hused = import_ytsph(filename,[0.0008], ('Gas','Temperature'), 'algae', color_log = False, n_ref=8)

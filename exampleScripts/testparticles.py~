@@ -1,0 +1,2 @@
+# check out: http://blenderartists.org/forum/archive/index.php/t-232443.html
+#  with: bpy.context.object.particle_systems[0].particles[ii].velocity = ([0,0,-ii/5])
